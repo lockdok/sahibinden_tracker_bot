@@ -1,0 +1,16 @@
+[Unit]
+Description=Приватный Telegram-бот для отслеживания объявлений Sahibinden
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sahibinden
+WorkingDirectory=/opt/sahibinden-watchlist
+EnvironmentFile=/opt/sahibinden-watchlist/.env
+ExecStart=/opt/sahibinden-watchlist/.venv/bin/python main.py bot
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

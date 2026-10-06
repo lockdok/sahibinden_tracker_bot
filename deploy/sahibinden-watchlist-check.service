@@ -1,0 +1,10 @@
+[Unit]
+Description=Ежедневная проверка цен в списке Sahibinden
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=sahibinden
+WorkingDirectory=/opt/sahibinden-watchlist
+EnvironmentFile=/opt/sahibinden-watchlist/.env
+ExecStart=/opt/sahibinden-watchlist/.venv/bin/python main.py check

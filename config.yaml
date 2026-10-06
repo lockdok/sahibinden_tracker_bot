@@ -1,0 +1,8 @@
+telegram:
+  # Значения считываются из TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в .env.
+  bot_token: ""
+  chat_id: ""
+watchlist:
+  unavailable_after_checks: 7
+  delay_between_ads_s: [3, 7]
+  browser_fallback: true

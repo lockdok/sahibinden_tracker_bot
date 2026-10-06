@@ -1,0 +1,11 @@
+[Unit]
+Description=Ежедневная случайно отложенная проверка цен Sahibinden (09:00-10:00, Стамбул)
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 Europe/Istanbul
+RandomizedDelaySec=1h
+Persistent=true
+Unit=sahibinden-watchlist-check.service
+
+[Install]
+WantedBy=timers.target
