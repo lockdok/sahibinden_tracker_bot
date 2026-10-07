@@ -1,5 +1,6 @@
 import unittest
-from src.listing_fetcher import canonicalize_url, listing_id_from_url, parse_listing_page, parse_price
+from unittest.mock import patch
+from src.listing_fetcher import _browser_executable_path, canonicalize_url, listing_id_from_url, parse_listing_page, parse_price
 from src.notifier import change_message
 from src.bot import is_authorized_chat
 
@@ -22,6 +23,11 @@ class ListingFetcherTests(unittest.TestCase):
             self.assertEqual(listing_id_from_url(canonical_url), expected_id)
     def test_rejects_non_listing_url(self):
         with self.assertRaises(ValueError): canonicalize_url("https://example.com/ilan/x")
+    def test_snap_chromium_path_is_selected_when_available(self):
+        with patch("src.listing_fetcher.Path.exists", return_value=True):
+            self.assertEqual(_browser_executable_path(), "/snap/bin/chromium")
+        with patch("src.listing_fetcher.Path.exists", return_value=False):
+            self.assertIsNone(_browser_executable_path())
     def test_parses_json_ld_listing(self):
         html = '''<script type="application/ld+json">{"name":"2+1 <Home>","description":"Kadikoy","offers":{"price":"1250000","priceCurrency":"TRY"}}</script>'''
         item = parse_listing_page(html, URL)
