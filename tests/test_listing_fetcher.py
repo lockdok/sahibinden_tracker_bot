@@ -27,10 +27,19 @@ class ListingFetcherTests(unittest.TestCase):
     def test_rejects_non_listing_url(self):
         with self.assertRaises(ValueError): canonicalize_url("https://example.com/ilan/x")
     def test_snap_chromium_path_is_selected_when_available(self):
-        with patch("src.listing_fetcher.Path.exists", return_value=True):
+        def available(path):
+            return str(path) == "/snap/bin/chromium"
+
+        with patch("src.listing_fetcher.os.path.isfile", side_effect=available):
             self.assertEqual(_browser_executable_path(), "/snap/bin/chromium")
-        with patch("src.listing_fetcher.Path.exists", return_value=False):
+        with patch("src.listing_fetcher.os.path.isfile", return_value=False):
             self.assertIsNone(_browser_executable_path())
+    def test_native_chrome_is_preferred_over_snap_chromium(self):
+        def available(path):
+            return str(path) in {"/usr/bin/google-chrome", "/snap/bin/chromium"}
+
+        with patch("src.listing_fetcher.os.path.isfile", side_effect=available):
+            self.assertEqual(_browser_executable_path(), "/usr/bin/google-chrome")
     def test_parses_json_ld_listing(self):
         html = '''<script type="application/ld+json">{"name":"2+1 <Home>","description":"Kadikoy","offers":{"price":"1250000","priceCurrency":"TRY"}}</script>'''
         item = parse_listing_page(html, URL)

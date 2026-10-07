@@ -2,7 +2,7 @@
 import asyncio, hashlib, json, logging, random, re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from pathlib import Path
+import os
 from typing import Literal
 from urllib.parse import urlparse, urlunparse
 from bs4 import BeautifulSoup
@@ -99,8 +99,14 @@ async def _fetch_curl(url: str) -> tuple[int, str]:
         return response.status_code, response.text
 
 def _browser_executable_path() -> str | None:
-    snap_chromium = "/snap/bin/chromium"
-    return snap_chromium if Path(snap_chromium).exists() else None
+    candidates = (
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/snap/bin/chromium",
+    )
+    return next((candidate for candidate in candidates if os.path.isfile(candidate)), None)
 
 async def _fetch_browser(url: str) -> tuple[int, str]:
     import nodriver as uc
@@ -109,7 +115,7 @@ async def _fetch_browser(url: str) -> tuple[int, str]:
         headless=True,
         browser_executable_path=browser_path,
         browser_args=["--lang=tr-TR"],
-        sandbox=browser_path is None,
+        sandbox=browser_path != "/snap/bin/chromium",
     )
     try:
         page = await browser.get(url); await asyncio.sleep(random.uniform(2, 4)); return 200, await page.get_content()
