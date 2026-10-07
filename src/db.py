@@ -1,5 +1,6 @@
 """Слой хранения SQLite для приватного списка отслеживания объявлений."""
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Any
 import aiosqlite
@@ -10,6 +11,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (id TEXT PRIMARY KEY,url TEXT NOT NULL UNIQUE,title TEXT NOT NULL,summary TEXT NOT NULL DEFAULT '',current_price INTEGER NOT NULL,current_currency TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,added_at TEXT NOT NULL,last_checked_at TEXT,unavailable_checks INTEGER NOT NULL DEFAULT 0,retired_at TEXT,retired_reason TEXT);
 CREATE TABLE IF NOT EXISTS price_history (id INTEGER PRIMARY KEY AUTOINCREMENT,listing_id TEXT NOT NULL REFERENCES listings(id),price INTEGER NOT NULL,currency TEXT NOT NULL,observed_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_history_listing ON price_history(listing_id, observed_at DESC);
+CREATE TABLE IF NOT EXISTS notification_outbox (id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL,sent_at TEXT);
 """
 def _now(): return datetime.now(timezone.utc).isoformat()
 def _connect():
@@ -46,6 +48,15 @@ async def active_listings() -> list[dict[str, Any]]:
     async with _connect() as conn:
         conn.row_factory = aiosqlite.Row
         async with conn.execute("SELECT * FROM listings WHERE active=1 ORDER BY added_at") as cur: return [dict(row) for row in await cur.fetchall()]
+async def pending_notifications() -> list[dict[str, Any]]:
+    async with _connect() as conn:
+        conn.row_factory = aiosqlite.Row
+        async with conn.execute("SELECT * FROM notification_outbox WHERE sent_at IS NULL ORDER BY id") as cur:
+            return [dict(row) for row in await cur.fetchall()]
+async def mark_notification_sent(notification_id: int) -> None:
+    async with _connect() as conn:
+        await conn.execute("UPDATE notification_outbox SET sent_at=? WHERE id=? AND sent_at IS NULL", (_now(), notification_id))
+        await conn.commit()
 async def record_success(item: ListingDetails) -> dict[str, Any] | None:
     now = _now()
     async with _connect() as conn:
@@ -55,7 +66,10 @@ async def record_success(item: ListingDetails) -> dict[str, Any] | None:
         if not old: await conn.rollback(); return None
         changed = old["current_price"] != item.price or old["current_currency"] != item.currency
         await conn.execute("UPDATE listings SET title=?,summary=?,url=?,current_price=?,current_currency=?,last_checked_at=?,unavailable_checks=0 WHERE id=?", (item.title,item.summary,item.url,item.price,item.currency,now,item.listing_id))
-        if changed: await conn.execute("INSERT INTO price_history (listing_id,price,currency,observed_at) VALUES (?,?,?,?)", (item.listing_id,item.price,item.currency,now))
+        if changed:
+            await conn.execute("INSERT INTO price_history (listing_id,price,currency,observed_at) VALUES (?,?,?,?)", (item.listing_id,item.price,item.currency,now))
+            payload = {"old_price":old["current_price"],"old_currency":old["current_currency"],"new_price":item.price,"new_currency":item.currency,"title":item.title,"summary":item.summary,"url":item.url}
+            await conn.execute("INSERT INTO notification_outbox (kind,payload,created_at) VALUES (?,?,?)", ("price_change",json.dumps(payload),now))
         await conn.commit()
         return {"old_price":old["current_price"],"old_currency":old["current_currency"],"new_price":item.price,"new_currency":item.currency,"title":item.title,"summary":item.summary,"url":item.url} if changed else None
 async def record_unavailable(listing_id: str, threshold: int) -> dict[str, Any] | None:
@@ -68,6 +82,8 @@ async def record_unavailable(listing_id: str, threshold: int) -> dict[str, Any] 
         count = row["unavailable_checks"] + 1
         if count >= threshold:
             await conn.execute("UPDATE listings SET active=0,unavailable_checks=?,retired_at=?,retired_reason='unavailable' WHERE id=?", (count,now,listing_id)); result=dict(row)
+            payload = {"title":row["title"],"url":row["url"],"threshold":threshold}
+            await conn.execute("INSERT INTO notification_outbox (kind,payload,created_at) VALUES (?,?,?)", ("retired",json.dumps(payload),now))
         else: await conn.execute("UPDATE listings SET unavailable_checks=?,last_checked_at=? WHERE id=?", (count,now,listing_id)); result=None
         await conn.commit(); return result
 async def remove_listing(identifier: str) -> dict[str, Any] | None:

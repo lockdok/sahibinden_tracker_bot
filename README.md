@@ -15,6 +15,7 @@ sudo useradd --system --create-home --shell /usr/sbin/nologin sahibinden
 sudo mkdir -p /opt/sahibinden-watchlist
 sudo chown sahibinden:sahibinden /opt/sahibinden-watchlist
 # Скопируйте проект в /opt/sahibinden-watchlist, затем выполните:
+cd /opt/sahibinden-watchlist
 sudo -u sahibinden python3 -m venv .venv
 sudo -u sahibinden .venv/bin/pip install -r requirements.txt
 sudo apt-get install -y chromium-browser
@@ -35,7 +36,7 @@ systemctl list-timers sahibinden-watchlist-check.timer
 journalctl -u sahibinden-watchlist-bot -f
 ```
 
-Таймер запускается в 09:00 по времени Europe/Istanbul; systemd случайно откладывает каждый запуск на срок до одного часа. Ручной запуск проверки: `sudo systemctl start sahibinden-watchlist-check.service`.
+Таймер запускается в 09:00 по времени Europe/Istanbul; systemd случайно откладывает каждый запуск на срок до одного часа. Неотправленные уведомления сохраняются в базе данных и повторно отправляются при следующей проверке. Ручной запуск проверки: `sudo systemctl start sahibinden-watchlist-check.service`.
 
 ## Локальная разработка
 
