@@ -10,6 +10,16 @@ class ListingFetcherTests(unittest.TestCase):
         url = canonicalize_url(URL)
         self.assertEqual(url, "https://www.sahibinden.com/ilan/emlak-konut-satilik-nice-home-123456789/detay")
         self.assertEqual(listing_id_from_url(url), "123456789")
+    def test_accepts_shared_listing_urls(self):
+        urls = (
+            "https://www.sahibinden.com/listing/emlak-konut-satilik-deniz-ve-millet-bahcesi-manzarali-metroya-yakin-bos-iskanli-2-plus1-1341411325/detail?utm_campaign=sahibinden_paylas&utm_medium=ilan_detay&utm_source=paylas&utm_content=174536269",
+            "https://www.sahibinden.com/listing/emlak-konut-satilik-pendik-marmara-hastanesi-ve-metro-ya-yakin-satilik-esyali-1-plus1-1343829260/detail",
+        )
+        expected_ids = ("1341411325", "1343829260")
+        for url, expected_id in zip(urls, expected_ids):
+            canonical_url = canonicalize_url(url)
+            self.assertNotIn("?", canonical_url)
+            self.assertEqual(listing_id_from_url(canonical_url), expected_id)
     def test_rejects_non_listing_url(self):
         with self.assertRaises(ValueError): canonicalize_url("https://example.com/ilan/x")
     def test_parses_json_ld_listing(self):

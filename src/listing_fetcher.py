@@ -21,7 +21,8 @@ class FetchResult:
 
 def canonicalize_url(raw_url: str) -> str:
     parsed = urlparse(raw_url.strip())
-    if parsed.scheme not in {"http", "https"} or parsed.netloc.lower().removeprefix("www.") != "sahibinden.com" or "/ilan/" not in parsed.path:
+    is_listing_path = re.search(r"/(?:ilan|listing)/", parsed.path, re.IGNORECASE)
+    if parsed.scheme not in {"http", "https"} or parsed.netloc.lower().removeprefix("www.") != "sahibinden.com" or not is_listing_path:
         raise ValueError("Please send a valid sahibinden.com listing URL.")
     return urlunparse(("https", "www.sahibinden.com", re.sub(r"/+", "/", parsed.path).rstrip("/"), "", "", ""))
 
