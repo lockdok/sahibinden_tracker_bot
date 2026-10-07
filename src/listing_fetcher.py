@@ -105,7 +105,12 @@ def _browser_executable_path() -> str | None:
 async def _fetch_browser(url: str) -> tuple[int, str]:
     import nodriver as uc
     browser_path = _browser_executable_path()
-    browser = await uc.start(headless=True, browser_executable_path=browser_path, browser_args=["--lang=tr-TR"])
+    browser = await uc.start(
+        headless=True,
+        browser_executable_path=browser_path,
+        browser_args=["--lang=tr-TR"],
+        sandbox=browser_path is None,
+    )
     try:
         page = await browser.get(url); await asyncio.sleep(random.uniform(2, 4)); return 200, await page.get_content()
     finally: browser.stop()
@@ -123,4 +128,5 @@ async def fetch_listing(url: str, browser_fallback: bool = True) -> FetchResult:
         if status in {404, 410}: return FetchResult("unavailable")
         return FetchResult("ok", parse_listing_page(html, url)) if status == 200 else FetchResult("error", error=f"Browser HTTP {status}")
     except Exception as exc:
-        logger.warning("Could not fetch %s: %s", url, exc); return FetchResult("error", error=str(exc))
+        logger.warning("Could not fetch %s (%s): %s", url, type(exc).__name__, exc)
+        return FetchResult("error", error=str(exc))

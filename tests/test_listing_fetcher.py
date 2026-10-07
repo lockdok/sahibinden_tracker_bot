@@ -1,6 +1,9 @@
+import asyncio
+import sys
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
-from src.listing_fetcher import _browser_executable_path, canonicalize_url, listing_id_from_url, parse_listing_page, parse_price
+from unittest.mock import AsyncMock, MagicMock, patch
+from src.listing_fetcher import _browser_executable_path, _fetch_browser, canonicalize_url, listing_id_from_url, parse_listing_page, parse_price
 from src.notifier import change_message
 from src.bot import is_authorized_chat
 
@@ -44,3 +47,26 @@ class ListingFetcherTests(unittest.TestCase):
     def test_private_chat_guard(self):
         self.assertTrue(is_authorized_chat(123, "123"))
         self.assertFalse(is_authorized_chat(456, "123"))
+
+class BrowserFallbackTests(unittest.IsolatedAsyncioTestCase):
+    async def test_snap_browser_uses_no_sandbox(self):
+        page = MagicMock()
+        page.get_content = AsyncMock(return_value="<html></html>")
+        browser = MagicMock()
+        browser.get = AsyncMock(return_value=page)
+        nodriver = SimpleNamespace(start=AsyncMock(return_value=browser))
+        with (
+            patch.dict(sys.modules, {"nodriver": nodriver}),
+            patch("src.listing_fetcher._browser_executable_path", return_value="/snap/bin/chromium"),
+            patch("src.listing_fetcher.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await _fetch_browser("https://www.sahibinden.com/listing/example-123/detail")
+
+        self.assertEqual(result, (200, "<html></html>"))
+        nodriver.start.assert_awaited_once_with(
+            headless=True,
+            browser_executable_path="/snap/bin/chromium",
+            browser_args=["--lang=tr-TR"],
+            sandbox=False,
+        )
+        browser.stop.assert_called_once()
